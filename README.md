@@ -1,5 +1,5 @@
 # Community Price Tracker
-
+ 
 A **community-driven data app** for logging and analyzing the prices of everyday goods (milk, bread, eggs, fuel, etc.) over time.  
 This project empowers local communities to **track inflation, compare cities, and visualize cost-of-living trends** using a fully local, privacy-friendly setup, built with **Python, SQLite, Pandas, and Streamlit**.
 
