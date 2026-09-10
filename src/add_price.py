@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-import argparse
-from datetime import date
-from db import connect, q, qi
+"""CLI to log a single price observation."""
 
-def ensure_item(con, name: str):
-    row = q(con, "SELECT id FROM item WHERE name=?", (name.strip(),))
-    if row:
-        return row[0]["id"]
-    return qi(con, "INSERT INTO item(name, category, unit) VALUES(?, 'general', 'unit')", (name.strip(),)).lastrowid
+from __future__ import annotations
+
+import argparse
+import sqlite3
+from datetime import date
+
+from db import connect, get_or_create_item, qi
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Add a price observation.")
@@ -21,10 +21,23 @@ def main() -> None:
     args = ap.parse_args()
 
     with connect() as con:
-        item_id = ensure_item(con, args.item)
-        qi(con, "INSERT INTO price(item_id, store_id, price, currency, quantity, date) VALUES(?,?,?,?,?,?)",
-           (item_id, args.store_id, args.price, args.currency, args.quantity, args.date))
+        item_id = get_or_create_item(con, args.item)
+        try:
+            qi(
+                con,
+                "INSERT INTO price(item_id, store_id, price, currency, quantity, date) "
+                "VALUES(?,?,?,?,?,?)",
+                (item_id, args.store_id, args.price, args.currency, args.quantity, args.date),
+            )
+        except sqlite3.IntegrityError as exc:
+            # BEHAVIOR CHANGE: previously this raised a raw traceback; now it
+            # exits with a message pointing at the likely cause.
+            raise SystemExit(
+                f"Could not log price: {exc}. "
+                f"Check that --store-id {args.store_id} exists (see list_data.py)."
+            ) from exc
     print("Price logged ✅")
+
 
 if __name__ == "__main__":
     main()
