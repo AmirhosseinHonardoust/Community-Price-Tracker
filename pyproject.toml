@@ -14,6 +14,18 @@ target-version = ["py310"]
 # numpy's stub files, which use 3.12-only syntax. Our own code targets 3.10+.
 python_version = "3.12"
 ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true

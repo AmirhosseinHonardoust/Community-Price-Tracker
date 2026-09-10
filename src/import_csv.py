@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from db import connect, get_or_create_item, get_or_create_store
+from db import (
+    DEFAULT_DB_PATH,
+    add_db_arg,
+    connect,
+    get_or_create_item,
+    get_or_create_store,
+    resolve_db_path,
+)
 
 REQ_COLS = {"item", "unit", "store", "city", "price", "currency", "quantity", "date"}
 
@@ -17,7 +24,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Import denormalized CSV into normalized SQLite schema."
     )
-    ap.add_argument("--db", default="data/prices.db", help="Path to SQLite DB")
+    add_db_arg(ap)
     ap.add_argument(
         "--file",
         required=True,
@@ -26,7 +33,10 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None, help="Import only first N rows (optional)")
     args = ap.parse_args()
 
-    db_path = Path(args.db)
+    # BEHAVIOR CHANGE: --db previously defaulted to the cwd-relative "data/prices.db",
+    # inconsistent with every other script's repo-root-relative default. Now aligned
+    # via the shared add_db_arg/resolve_db_path (CPT_DB_PATH env var, else DEFAULT_DB_PATH).
+    db_path = resolve_db_path(args.db) or DEFAULT_DB_PATH
     csv_path = Path(args.file)
     if not db_path.exists():
         raise SystemExit(f"DB not found: {db_path}. Run: python src/init_db.py")

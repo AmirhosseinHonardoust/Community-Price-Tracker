@@ -7,7 +7,7 @@ import argparse
 import sqlite3
 from datetime import date
 
-from db import connect, get_or_create_item, qi
+from db import add_db_arg, connect, get_or_create_item, qi, resolve_db_path
 
 
 def main() -> None:
@@ -18,9 +18,10 @@ def main() -> None:
     ap.add_argument("--currency", default="USD")
     ap.add_argument("--quantity", type=float, default=1.0, help="How many units covered by price")
     ap.add_argument("--date", default=date.today().isoformat())
+    add_db_arg(ap)
     args = ap.parse_args()
 
-    with connect() as con:
+    with connect(resolve_db_path(args.db)) as con:
         item_id = get_or_create_item(con, args.item)
         try:
             qi(

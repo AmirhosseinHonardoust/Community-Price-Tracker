@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+import argparse
 import sqlite3
 
 from tabulate import tabulate
 
-from db import connect, q
+from db import add_db_arg, connect, q, resolve_db_path
 
 
 def _as_dicts(rows: list[sqlite3.Row]) -> list[dict]:
@@ -21,7 +22,11 @@ def _as_dicts(rows: list[sqlite3.Row]) -> list[dict]:
 
 
 def main() -> None:
-    with connect() as con:
+    ap = argparse.ArgumentParser(description="Print items, stores, and prices tables.")
+    add_db_arg(ap)
+    args = ap.parse_args()
+
+    with connect(resolve_db_path(args.db)) as con:
         items = q(con, "SELECT * FROM item ORDER BY name")
         stores = q(con, "SELECT * FROM store ORDER BY name")
         prices = q(
