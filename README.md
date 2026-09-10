@@ -334,6 +334,10 @@ Launch the app:
 ```bash
 streamlit run src/streamlit_app.py
 ```
+<div align="center">
+
+<img width="466" height="532" alt="Screenshot 2026-09-10 at 13-21-30 Community Price Tracker" src="https://github.com/user-attachments/assets/6b0c77fd-829c-45ed-84c6-ae4b41926666" />
+</div>
 
 The dashboard helps you:
 
@@ -342,10 +346,6 @@ The dashboard helps you:
 - view trend charts by item
 - compare basket costs across cities
 - work entirely locally, with no data leaving your machine
-
-<div align="center">
-<img width="676" alt="Streamlit dashboard" src="https://github.com/user-attachments/assets/c1c8cb78-adc3-4619-92e7-72ae614c30f2" />
-</div>
 
 ---
 
@@ -383,11 +383,10 @@ The dashboard helps you:
 
 <div align="center">
 
-![Trends tab screenshot](https://github.com/user-attachments/assets/c1c8cb78-adc3-4619-92e7-72ae614c30f2)
-
-![Basket comparison screenshot](https://github.com/user-attachments/assets/77dd4c17-de07-4d8e-84e3-2b37d6e993d3)
-
-The Streamlit dashboard's Trends tab and Basket Comparison tab mirror the same charts interactively, with filters for item, city, and date range.
+| Trends Tab | Basket Comparison |
+|---|---|
+| <img width="657" height="496" alt="505870260-c1c8cb78-adc3-4619-92e7-72ae614c30f2" src="https://github.com/user-attachments/assets/0f80dd8d-6222-49b1-875b-b7e621e98ee5" /> | <img width="684" height="555" alt="505870277-77dd4c17-de07-4d8e-84e3-2b37d6e993d3" src="https://github.com/user-attachments/assets/28309c29-bf8a-46e7-8e0f-35532399cf77" /> |
+| Lets you pick an item by exact name (e.g. "Milk"), then shows its logged price over time as a line chart, with tabs above to switch to Log Price, Items & Stores, or Basket. | Lets you enter a comma-separated list of items (e.g. "Milk, Bread, Eggs"), then shows the total basket cost as a bar chart broken down by city, for comparing cost-of-living across locations. |
 
 </div>
 
