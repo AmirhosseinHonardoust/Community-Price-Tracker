@@ -8,8 +8,8 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from dataframe_utils import require_columns, rows_to_df
-from db import connect, q, qi
+from dataframe_utils import require_columns, rows_to_df, with_unit_price
+from db import connect, price_rows, q, qi
 
 st.set_page_config(page_title="Community Price Tracker", page_icon="🧾", layout="centered")
 st.title("🧾 Community Price Tracker")
@@ -94,28 +94,7 @@ with tab2:
     with connect() as con:
         items_df = rows_to_df(q(con, "SELECT * FROM item ORDER BY name"))
         stores_df = rows_to_df(q(con, "SELECT * FROM store ORDER BY name"))
-        prices_df = rows_to_df(
-            q(
-                con,
-                """
-            SELECT
-              p.id,
-              i.name  AS item,
-              i.unit  AS unit,
-              s.name  AS store,
-              s.city  AS city,
-              p.price AS price,
-              p.currency AS currency,
-              p.quantity AS quantity,
-              p.date AS date
-            FROM price p
-            LEFT JOIN item  i ON i.id = p.item_id
-            LEFT JOIN store s ON s.id = p.store_id
-            ORDER BY p.date DESC
-            LIMIT 500
-        """,
-            )
-        )
+        prices_df = rows_to_df(price_rows(con, limit=500))
     st.write("**Items**")
     st.dataframe(items_df)
     st.write("**Stores**")
@@ -134,23 +113,7 @@ with tab3:
     item_name = st.text_input("Item name to visualize (exact)", value="Milk", key="trend_item")
     if st.button("Show trend", key="show_trend_btn"):
         with connect() as con:
-            rows = q(
-                con,
-                """
-                SELECT
-                  i.name AS item,
-                  i.unit AS unit,
-                  s.city AS city,
-                  p.price AS price,
-                  p.quantity AS quantity,
-                  p.date AS date
-                FROM price p
-                LEFT JOIN item  i ON i.id = p.item_id
-                LEFT JOIN store s ON s.id = p.store_id
-                WHERE lower(i.name) = lower(?)
-            """,
-                (item_name.strip(),),
-            )
+            rows = price_rows(con, item_names=[item_name.strip()]) if item_name.strip() else []
         trend_df = rows_to_df(rows)
         if trend_df.empty:
             st.warning("No data for that item yet.")
@@ -159,7 +122,7 @@ with tab3:
                 trend_df, {"item", "unit", "city", "price", "quantity", "date"}, "Trends query"
             )
             trend_df["date"] = pd.to_datetime(trend_df["date"], errors="coerce")
-            trend_df["unit_price"] = trend_df["price"] / trend_df["quantity"].replace(0, pd.NA)
+            trend_df = with_unit_price(trend_df)
             pivot = trend_df.pivot_table(
                 index="date", columns="city", values="unit_price", aggfunc="mean"
             ).sort_index()
@@ -175,21 +138,8 @@ with tab4:
         if not basket_items:
             st.warning("Enter at least one item.")
         else:
-            qmarks = ",".join("?" * len(basket_items))
-            sql = f"""
-                SELECT
-                  i.name AS item,
-                  s.city AS city,
-                  p.price AS price,
-                  p.quantity AS quantity,
-                  p.date AS date
-                FROM price p
-                LEFT JOIN item  i ON i.id = p.item_id
-                LEFT JOIN store s ON s.id = p.store_id
-                WHERE lower(i.name) IN ({qmarks})
-            """
             with connect() as con:
-                rows = q(con, sql, tuple(map(str.lower, basket_items)))
+                rows = price_rows(con, item_names=basket_items)
             basket_df = rows_to_df(rows)
             if basket_df.empty:
                 st.warning("No data for these items yet.")
@@ -198,9 +148,10 @@ with tab4:
                     basket_df, {"item", "city", "price", "quantity", "date"}, "Basket query"
                 )
                 latest = (
-                    basket_df.assign(date=pd.to_datetime(basket_df["date"], errors="coerce"))
+                    with_unit_price(
+                        basket_df.assign(date=pd.to_datetime(basket_df["date"], errors="coerce"))
+                    )
                     .sort_values("date")
-                    .assign(unit_price=lambda d: d["price"] / d["quantity"].replace(0, pd.NA))
                     .groupby(["city", "item"])
                     .tail(1)
                 )

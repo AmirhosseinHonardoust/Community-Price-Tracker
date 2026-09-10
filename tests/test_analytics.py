@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 import analytics
-from dataframe_utils import require_columns
+from dataframe_utils import require_columns, with_unit_price
 from db import connect, exec_script, qi
 
 SCHEMA = Path(__file__).resolve().parents[1] / "src" / "schema.sql"
@@ -93,6 +93,24 @@ def test_main_with_no_data_prints_message(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["analytics.py", "--outdir", str(outdir)])
     analytics.main()
     assert "No data available" in capsys.readouterr().out
+
+
+def test_with_unit_price_divides_price_by_quantity():
+    df = pd.DataFrame({"price": [10.0, 5.0], "quantity": [2.0, 1.0]})
+    out = with_unit_price(df)
+    assert list(out["unit_price"]) == [5.0, 5.0]
+
+
+def test_with_unit_price_treats_zero_quantity_as_missing():
+    df = pd.DataFrame({"price": [10.0], "quantity": [0.0]})
+    out = with_unit_price(df)
+    assert pd.isna(out["unit_price"].iloc[0])
+
+
+def test_with_unit_price_does_not_mutate_input():
+    df = pd.DataFrame({"price": [10.0], "quantity": [2.0]})
+    with_unit_price(df)
+    assert "unit_price" not in df.columns
 
 
 def test_main_with_unknown_item_prints_no_data_message(tmp_path, monkeypatch, capsys):

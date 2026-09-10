@@ -16,6 +16,9 @@ def main() -> None:
     add_db_arg(ap)
     args = ap.parse_args()
 
+    if not args.name.strip():
+        raise SystemExit("--name must not be blank")
+
     with connect(resolve_db_path(args.db)) as con:
         item_id = get_or_create_item(con, args.name, args.unit, args.category)
     print(f"Item ready with id={item_id} ✅")

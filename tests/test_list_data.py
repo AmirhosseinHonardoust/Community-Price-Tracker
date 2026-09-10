@@ -38,6 +38,57 @@ def test_list_data_main_prints_named_headers(tmp_path, monkeypatch, capsys):
     assert "| 0 " not in out
 
 
+def _seed_multi_city(db_path: Path) -> None:
+    with connect(db_path) as con:
+        exec_script(con, SCHEMA)
+        qi(con, "INSERT INTO item(name, unit) VALUES('Milk','liter')")
+        qi(con, "INSERT INTO item(name, unit) VALUES('Bread','loaf')")
+        qi(con, "INSERT INTO store(name, city) VALUES('Market 1','Helsinki')")
+        qi(con, "INSERT INTO store(name, city) VALUES('Market 2','Berlin')")
+        qi(
+            con,
+            "INSERT INTO price(item_id,store_id,price,currency,quantity,date) "
+            "VALUES(1,1,1.3,'EUR',1,'2025-01-01')",
+        )
+        qi(
+            con,
+            "INSERT INTO price(item_id,store_id,price,currency,quantity,date) "
+            "VALUES(2,2,2.1,'EUR',1,'2025-01-02')",
+        )
+
+
+def test_list_data_item_filter_restricts_prices(tmp_path, monkeypatch, capsys):
+    db_path = tmp_path / "t.db"
+    _seed_multi_city(db_path)
+    monkeypatch.setattr("sys.argv", ["list_data.py", "--db", str(db_path), "--item", "Milk"])
+    list_data.main()
+    out = capsys.readouterr().out
+    assert "Milk" in out
+    assert "Bread" not in out.split("Prices")[1]
+
+
+def test_list_data_city_filter_restricts_prices(tmp_path, monkeypatch, capsys):
+    db_path = tmp_path / "t.db"
+    _seed_multi_city(db_path)
+    monkeypatch.setattr("sys.argv", ["list_data.py", "--db", str(db_path), "--city", "Berlin"])
+    list_data.main()
+    out = capsys.readouterr().out
+    prices_section = out.split("Prices")[1]
+    assert "Bread" in prices_section
+    assert "Milk" not in prices_section
+
+
+def test_list_data_limit_restricts_row_count(tmp_path, monkeypatch, capsys):
+    db_path = tmp_path / "t.db"
+    _seed_multi_city(db_path)
+    monkeypatch.setattr("sys.argv", ["list_data.py", "--db", str(db_path), "--limit", "1"])
+    list_data.main()
+    prices_section = capsys.readouterr().out.split("Prices")[1]
+    # Only the most recent row (2025-01-02, Bread) should appear.
+    assert "Bread" in prices_section
+    assert "Milk" not in prices_section
+
+
 def test_list_data_main_handles_empty_db(tmp_path, monkeypatch, capsys):
     db_path = tmp_path / "t.db"
     with connect(db_path) as con:

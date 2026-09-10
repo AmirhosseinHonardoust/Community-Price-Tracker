@@ -49,6 +49,24 @@ def test_import_csv_creates_items_stores_prices(tmp_path, monkeypatch):
     assert [r["price"] for r in prices] == [1.30, 1.35]
 
 
+def test_import_csv_honors_cpt_db_path_env_var_when_db_flag_omitted(tmp_path, monkeypatch):
+    """Regression test: --db omitted used to silently ignore CPT_DB_PATH and
+    look for the DB at DEFAULT_DB_PATH instead, raising a confusing
+    'DB not found' SystemExit even though the DB existed at CPT_DB_PATH."""
+    db_path = make_db(tmp_path)
+    csv_path = write_csv(
+        tmp_path,
+        [["Milk", "liter", "Market 1", "Helsinki", "1.30", "EUR", "1", "2025-01-01"]],
+    )
+    monkeypatch.setenv("CPT_DB_PATH", str(db_path))
+    monkeypatch.setattr("sys.argv", ["import_csv.py", "--file", str(csv_path)])
+    import_main()
+
+    with connect(db_path) as con:
+        prices = q(con, "SELECT price FROM price")
+    assert [r["price"] for r in prices] == [1.30]
+
+
 def test_import_csv_missing_required_column_exits(tmp_path, monkeypatch):
     db_path = make_db(tmp_path)
     bad_csv = tmp_path / "bad.csv"
