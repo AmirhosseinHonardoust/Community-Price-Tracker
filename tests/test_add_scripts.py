@@ -39,6 +39,27 @@ def test_add_store_is_idempotent(tmp_path, monkeypatch):
     assert len(rows) == 1
 
 
+def test_add_item_rejects_blank_name(tmp_path, monkeypatch):
+    db_path = tmp_path / "t.db"
+    init_db(db_path)
+    monkeypatch.setenv("CPT_DB_PATH", str(db_path))
+    monkeypatch.setattr("sys.argv", ["add_item.py", "--name", "   "])
+    with pytest.raises(SystemExit, match="--name must not be blank"):
+        add_item.main()
+
+
+def test_add_store_rejects_blank_name(tmp_path, monkeypatch):
+    """Regression test: a blank --name used to silently print 'id=None'
+    instead of failing, since get_or_create_store treats blank names as
+    its 'no store given' sentinel."""
+    db_path = tmp_path / "t.db"
+    init_db(db_path)
+    monkeypatch.setenv("CPT_DB_PATH", str(db_path))
+    monkeypatch.setattr("sys.argv", ["add_store.py", "--name", "   "])
+    with pytest.raises(SystemExit, match="--name must not be blank"):
+        add_store.main()
+
+
 def test_add_price_raises_friendly_error_on_bad_store_id(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     init_db(db_path)
@@ -100,6 +121,31 @@ def test_add_item_accepts_explicit_db_flag(tmp_path, monkeypatch):
     with connect(db_path) as con:
         rows = q(con, "SELECT * FROM item WHERE name='Bread'")
     assert len(rows) == 1
+
+
+def test_add_price_rejects_negative_price(tmp_path, monkeypatch):
+    db_path = tmp_path / "t.db"
+    init_db(db_path)
+    monkeypatch.setenv("CPT_DB_PATH", str(db_path))
+    monkeypatch.setattr("sys.argv", ["add_price.py", "--item", "Milk", "--price", "-1.5"])
+    with pytest.raises(SystemExit, match="--price must be >= 0"):
+        add_price.main()
+    with connect(db_path) as con:
+        assert q(con, "SELECT * FROM price") == []
+
+
+def test_add_price_rejects_non_positive_quantity(tmp_path, monkeypatch):
+    db_path = tmp_path / "t.db"
+    init_db(db_path)
+    monkeypatch.setenv("CPT_DB_PATH", str(db_path))
+    monkeypatch.setattr(
+        "sys.argv",
+        ["add_price.py", "--item", "Milk", "--price", "1.5", "--quantity", "0"],
+    )
+    with pytest.raises(SystemExit, match="--quantity must be > 0"):
+        add_price.main()
+    with connect(db_path) as con:
+        assert q(con, "SELECT * FROM price") == []
 
 
 def test_add_price_accepts_explicit_db_flag(tmp_path, monkeypatch):

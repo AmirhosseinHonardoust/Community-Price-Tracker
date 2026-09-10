@@ -1,5 +1,7 @@
 # Community Price Tracker
- 
+
+[![CI](https://github.com/AmirhosseinHonardoust/Community-Price-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirhosseinHonardoust/Community-Price-Tracker/actions/workflows/ci.yml)
+
 A **community-driven data app** for logging and analyzing the prices of everyday goods (milk, bread, eggs, fuel, etc.) over time.  
 This project empowers local communities to **track inflation, compare cities, and visualize cost-of-living trends** using a fully local, privacy-friendly setup, built with **Python, SQLite, Pandas, and Streamlit**.
 
@@ -34,26 +36,31 @@ Analyze and visualize:
 
 ## Project Structure
 ```
-community-price-tracker/
+Community-Price-Tracker/
 │
-├── data/
-│   ├── prices.db               # SQLite database
-│   ├── generated_prices.csv    # Synthetic dataset
+├── data/                        # gitignored: created at runtime
+│   ├── prices.db                # SQLite database
+│   ├── generated_prices.csv     # Synthetic dataset
 │
-├── outputs/
-│   ├── trend_milk.png          # Sample trend chart
-│   ├── basket_by_city.png      # Basket comparison chart
+├── outputs/                     # gitignored: created at runtime
+│   ├── trend_milk.png           # Sample trend chart
+│   ├── basket_by_city.png       # Basket comparison chart
 │
 ├── src/
-│   ├── schema.sql              # Database schema
-│   ├── db.py                   # SQLite helper functions
-│   ├── init_db.py              # Initializes DB
-│   ├── generate_data.py        # Generates synthetic CSV data
-│   ├── import_csv.py           # Imports CSV → normalized schema
-│   ├── analytics.py            # Generates charts
-│   ├── streamlit_app.py        # Interactive web app
+│   ├── schema.sql                # Database schema
+│   ├── db.py                     # SQLite helpers + shared price_rows() query
+│   ├── dataframe_utils.py        # Shared DataFrame helpers (unit_price, column checks)
+│   ├── init_db.py                # Initializes DB
+│   ├── generate_data.py          # Generates synthetic CSV data
+│   ├── import_csv.py             # Imports CSV → normalized schema
+│   ├── analytics.py              # Generates charts
+│   ├── streamlit_app.py          # Interactive web app
 │   ├── add_item.py / add_store.py / add_price.py / list_data.py
 │
+├── tests/                        # pytest suite (see Development below)
+│
+├── .github/workflows/ci.yml      # lint, format, type-check, test on every push/PR
+├── pyproject.toml                # ruff/black/mypy/pytest/coverage config
 └── README.md
 ```
 
@@ -63,8 +70,8 @@ community-price-tracker/
 
 ### Clone or download
 ```bash
-git clone https://github.com/<your-username>/community-price-tracker.git
-cd community-price-tracker
+git clone https://github.com/AmirhosseinHonardoust/Community-Price-Tracker.git
+cd Community-Price-Tracker
 ```
 
 ### Create a virtual environment
@@ -83,6 +90,25 @@ pip install -r requirements.txt
 ```bash
 python src/init_db.py
 ```
+
+---
+
+## Configuration
+
+By default, every script reads/writes `data/prices.db` (relative to the repo
+root). Override this with the `CPT_DB_PATH` environment variable, or pass
+`--db <path>` to any individual command:
+
+```bash
+export CPT_DB_PATH=/path/to/another.db   # (Windows: set CPT_DB_PATH=...)
+python src/init_db.py
+python src/list_data.py
+```
+
+`--db` always wins if given; otherwise `CPT_DB_PATH` is used; otherwise it
+falls back to `data/prices.db`. This precedence is consistent across every
+script (`add_item.py`, `add_store.py`, `add_price.py`, `import_csv.py`,
+`list_data.py`).
 
 ---
 
@@ -112,6 +138,10 @@ Automatically:
 List what’s inside the database:
 ```bash
 python src/list_data.py
+```
+Optionally filter the Prices table:
+```bash
+python src/list_data.py --item Milk --city Helsinki --limit 20
 ```
 Expected output:
 ```
@@ -213,6 +243,30 @@ Community volunteers across different cities can:
 ** Basket Comparison**
 
 <img width="684" height="616" alt="Screenshot 2025-10-27 at 10-46-38 Community Price Tracker" src="https://github.com/user-attachments/assets/77dd4c17-de07-4d8e-84e3-2b37d6e993d3" />
+
+---
+
+## Development
+
+This repo enforces a quality gate in CI (`.github/workflows/ci.yml`) on every
+push and pull request. To run the same checks locally:
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+ruff check --select E,F,I,B,SIM,UP --line-length 100 src tests
+black --check --line-length 100 src tests
+mypy --ignore-missing-imports src
+pytest -q --cov=src --cov-report=term-missing --cov-fail-under=85
+```
+
+`requirements.lock` pins exact, known-good versions (generated for Python
+3.11, matching CI) for a reproducible local install — CI itself installs from
+the loose ranges in `requirements.txt`. Use whichever fits your workflow:
+```bash
+pip install -r requirements.lock
+```
 
 ---
 

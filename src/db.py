@@ -31,9 +31,15 @@ def add_db_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def resolve_db_path(db_arg: str | None) -> Path | None:
-    """Turn an optional --db CLI value into a Path, or None to use the default."""
-    return Path(db_arg) if db_arg else None
+def resolve_db_path(db_arg: str | None) -> Path:
+    """Turn an optional --db CLI value into a concrete Path.
+
+    Precedence when `db_arg` is falsy: CPT_DB_PATH env var, then DEFAULT_DB_PATH.
+    Centralizing this here (instead of leaving it to `connect`'s internal
+    fallback) lets callers that need the path *before* opening a connection
+    (e.g. import_csv.py checking existence) still honor CPT_DB_PATH.
+    """
+    return Path(db_arg) if db_arg else _default_db_path()
 
 
 def connect(db_path: Path | None = None) -> sqlite3.Connection:
@@ -88,6 +94,58 @@ def get_or_create_item(
     con.commit()
     assert cur.lastrowid is not None
     return cur.lastrowid
+
+
+PRICE_JOIN_SQL = """
+    SELECT
+      p.id,
+      i.name AS item,
+      i.unit AS unit,
+      s.name AS store,
+      s.city AS city,
+      p.price AS price,
+      p.currency AS currency,
+      p.quantity AS quantity,
+      p.date AS date
+    FROM price p
+    LEFT JOIN item i ON i.id = p.item_id
+    LEFT JOIN store s ON s.id = p.store_id
+"""
+
+
+def price_rows(
+    con: sqlite3.Connection,
+    item_names: list[str] | None = None,
+    city: str | None = None,
+    order_by: str = "p.date DESC, i.name",
+    limit: int | None = None,
+) -> list[sqlite3.Row]:
+    """Run the shared item/store/price join, used by list_data, analytics, and the
+    Streamlit app so the query and column names live in exactly one place.
+
+    `item_names`, when given, case-insensitively filters to those item names
+    (used by the Streamlit Trends/Basket tabs and list_data's --item flag).
+    `city` case-insensitively filters to one city (list_data's --city flag).
+    `order_by` and `limit` are trusted internal constants, never user input,
+    so it's safe to splice them into the SQL string directly.
+    """
+    sql = PRICE_JOIN_SQL
+    conditions = []
+    params: list[str] = []
+    if item_names:
+        placeholders = ",".join("?" * len(item_names))
+        conditions.append(f"lower(i.name) IN ({placeholders})")
+        params.extend(x.lower() for x in item_names)
+    if city:
+        conditions.append("lower(s.city) = lower(?)")
+        params.append(city)
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+    if order_by:
+        sql += f" ORDER BY {order_by}"
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+    return q(con, sql, tuple(params))
 
 
 def get_or_create_store(

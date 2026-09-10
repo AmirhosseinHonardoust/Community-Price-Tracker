@@ -8,7 +8,7 @@ import sqlite3
 
 from tabulate import tabulate
 
-from db import add_db_arg, connect, q, resolve_db_path
+from db import add_db_arg, connect, price_rows, q, resolve_db_path
 
 
 def _as_dicts(rows: list[sqlite3.Row]) -> list[dict]:
@@ -24,18 +24,16 @@ def _as_dicts(rows: list[sqlite3.Row]) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Print items, stores, and prices tables.")
     add_db_arg(ap)
+    ap.add_argument("--item", action="append", help="Only show prices for this item (repeatable)")
+    ap.add_argument("--city", default=None, help="Only show prices logged in this city")
+    ap.add_argument("--limit", type=int, default=None, help="Only show the N most recent prices")
     args = ap.parse_args()
 
     with connect(resolve_db_path(args.db)) as con:
         items = q(con, "SELECT * FROM item ORDER BY name")
         stores = q(con, "SELECT * FROM store ORDER BY name")
-        prices = q(
-            con,
-            "SELECT p.id, i.name AS item, i.unit, s.name AS store, s.city, "
-            "p.price, p.currency, p.quantity, p.date "
-            "FROM price p LEFT JOIN item i ON i.id=p.item_id "
-            "LEFT JOIN store s ON s.id=p.store_id ORDER BY p.date DESC, i.name",
-        )
+        prices = price_rows(con, item_names=args.item, city=args.city, limit=args.limit)
+
     print("\nItems")
     print(tabulate(_as_dicts(items), headers="keys", tablefmt="github"))
     print("\nStores")

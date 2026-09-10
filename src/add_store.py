@@ -17,6 +17,13 @@ def main() -> None:
     add_db_arg(ap)
     args = ap.parse_args()
 
+    # BUG FIX: a blank --name used to sail through argparse's required=True
+    # check, then silently return None from get_or_create_store (its
+    # "no store given" sentinel) with no error -- so `add_store.py --name " "`
+    # printed "Store ready with id=None" instead of failing loudly.
+    if not args.name.strip():
+        raise SystemExit("--name must not be blank")
+
     with connect(resolve_db_path(args.db)) as con:
         # BEHAVIOR CHANGE: previously this always inserted a new row, so running
         # this command twice with the same name/city silently created duplicate

@@ -28,3 +28,14 @@ def require_columns(df: pd.DataFrame, required: set[str], context: str) -> None:
             f"Seen columns: {list(df.columns)}. "
             "Fix: delete data/prices.db, run src/init_db.py, then add prices again."
         )
+
+
+def with_unit_price(df: pd.DataFrame) -> pd.DataFrame:
+    """Return `df` with a `unit_price` column (price / quantity, 0-quantity -> NA).
+
+    Shared by analytics.py and the Streamlit Trends/Basket tabs so the
+    zero-quantity handling can't drift between the CLI and the UI.
+    """
+    df = df.copy()
+    df["unit_price"] = df["price"] / df["quantity"].replace(0, pd.NA)
+    return df

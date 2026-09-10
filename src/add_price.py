@@ -21,6 +21,14 @@ def main() -> None:
     add_db_arg(ap)
     args = ap.parse_args()
 
+    # Validate up front with a clear message, rather than letting these fall
+    # through to the DB's CHECK(price >= 0) constraint and a generic
+    # IntegrityError that (misleadingly) always pointed at --store-id.
+    if args.price < 0:
+        raise SystemExit(f"--price must be >= 0, got {args.price}")
+    if args.quantity <= 0:
+        raise SystemExit(f"--quantity must be > 0, got {args.quantity}")
+
     with connect(resolve_db_path(args.db)) as con:
         item_id = get_or_create_item(con, args.item)
         try:
@@ -31,8 +39,9 @@ def main() -> None:
                 (item_id, args.store_id, args.price, args.currency, args.quantity, args.date),
             )
         except sqlite3.IntegrityError as exc:
-            # BEHAVIOR CHANGE: previously this raised a raw traceback; now it
-            # exits with a message pointing at the likely cause.
+            # Any remaining IntegrityError at this point is a foreign-key
+            # failure (price/quantity are already validated above), so it's
+            # safe to point specifically at --store-id.
             raise SystemExit(
                 f"Could not log price: {exc}. "
                 f"Check that --store-id {args.store_id} exists (see list_data.py)."

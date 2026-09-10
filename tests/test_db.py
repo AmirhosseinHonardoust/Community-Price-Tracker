@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from db import connect, exec_script, get_or_create_item, get_or_create_store, q, qi
+from db import connect, exec_script, get_or_create_item, get_or_create_store, price_rows, q, qi
 
 SCHEMA = Path(__file__).resolve().parents[1] / "src" / "schema.sql"
 
@@ -67,3 +67,52 @@ def test_get_or_create_store_returns_none_for_blank_name(tmp_path):
     with connect(db_path) as con:
         assert get_or_create_store(con, "", "Helsinki") is None
         assert get_or_create_store(con, None, "Helsinki") is None
+
+
+def _seed_prices(con) -> None:
+    qi(con, "INSERT INTO item(name, unit) VALUES('Milk','liter')")
+    qi(con, "INSERT INTO item(name, unit) VALUES('Bread','loaf')")
+    qi(con, "INSERT INTO store(name, city) VALUES('Market 1','Helsinki')")
+    qi(con, "INSERT INTO store(name, city) VALUES('Market 2','Berlin')")
+    qi(
+        con,
+        "INSERT INTO price(item_id,store_id,price,currency,quantity,date) "
+        "VALUES(1,1,1.3,'EUR',1,'2025-01-01')",
+    )
+    qi(
+        con,
+        "INSERT INTO price(item_id,store_id,price,currency,quantity,date) "
+        "VALUES(2,2,2.1,'EUR',1,'2025-01-02')",
+    )
+
+
+def test_price_rows_no_filter_returns_everything(tmp_path):
+    db_path = make_db(tmp_path)
+    with connect(db_path) as con:
+        _seed_prices(con)
+        rows = price_rows(con)
+    assert {r["item"] for r in rows} == {"Milk", "Bread"}
+
+
+def test_price_rows_item_names_filters_case_insensitively(tmp_path):
+    db_path = make_db(tmp_path)
+    with connect(db_path) as con:
+        _seed_prices(con)
+        rows = price_rows(con, item_names=["milk"])
+    assert [r["item"] for r in rows] == ["Milk"]
+
+
+def test_price_rows_city_filters_case_insensitively(tmp_path):
+    db_path = make_db(tmp_path)
+    with connect(db_path) as con:
+        _seed_prices(con)
+        rows = price_rows(con, city="berlin")
+    assert [r["item"] for r in rows] == ["Bread"]
+
+
+def test_price_rows_limit_caps_row_count(tmp_path):
+    db_path = make_db(tmp_path)
+    with connect(db_path) as con:
+        _seed_prices(con)
+        rows = price_rows(con, limit=1)
+    assert len(rows) == 1

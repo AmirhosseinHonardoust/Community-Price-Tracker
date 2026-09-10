@@ -10,8 +10,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from dataframe_utils import require_columns, rows_to_df
-from db import connect, q
+from dataframe_utils import require_columns, rows_to_df, with_unit_price
+from db import connect, price_rows
 
 
 def ensure_outdir(p: Path) -> Path:
@@ -23,23 +23,7 @@ def ensure_outdir(p: Path) -> Path:
 def load_prices_df() -> pd.DataFrame:
     """Load all price observations joined with item/store info, with unit_price computed."""
     with connect() as con:
-        rows = q(
-            con,
-            """
-            SELECT
-              p.id,
-              i.name AS item,
-              i.unit,
-              s.city,
-              p.price,
-              p.quantity,
-              p.currency,
-              p.date
-            FROM price p
-            LEFT JOIN item i ON i.id = p.item_id
-            LEFT JOIN store s ON s.id = p.store_id
-        """,
-        )
+        rows = price_rows(con)
     df = rows_to_df(rows)
     if df.empty:
         return df
@@ -53,7 +37,7 @@ def load_prices_df() -> pd.DataFrame:
         sys.exit(1)
 
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["unit_price"] = df["price"] / df["quantity"].replace(0, pd.NA)
+    df = with_unit_price(df)
     return df
 
 

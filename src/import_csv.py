@@ -9,7 +9,6 @@ from pathlib import Path
 import pandas as pd
 
 from db import (
-    DEFAULT_DB_PATH,
     add_db_arg,
     connect,
     get_or_create_item,
@@ -33,10 +32,12 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None, help="Import only first N rows (optional)")
     args = ap.parse_args()
 
-    # BEHAVIOR CHANGE: --db previously defaulted to the cwd-relative "data/prices.db",
-    # inconsistent with every other script's repo-root-relative default. Now aligned
-    # via the shared add_db_arg/resolve_db_path (CPT_DB_PATH env var, else DEFAULT_DB_PATH).
-    db_path = resolve_db_path(args.db) or DEFAULT_DB_PATH
+    # BUG FIX: this used to fall back to DEFAULT_DB_PATH directly instead of
+    # calling resolve_db_path's fallback, so it silently ignored CPT_DB_PATH
+    # whenever --db was omitted (every other script honored it via connect()).
+    # resolve_db_path now applies the same CPT_DB_PATH -> DEFAULT_DB_PATH
+    # precedence as connect(), so this is aligned with every other script.
+    db_path = resolve_db_path(args.db)
     csv_path = Path(args.file)
     if not db_path.exists():
         raise SystemExit(f"DB not found: {db_path}. Run: python src/init_db.py")
