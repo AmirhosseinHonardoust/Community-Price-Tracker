@@ -68,3 +68,40 @@ def test_require_columns_raises_on_missing():
     df = pd.DataFrame({"a": [1]})
     with pytest.raises(ValueError):
         require_columns(df, {"a", "b"}, "test context")
+
+
+def test_main_with_item_and_basket_writes_charts(tmp_path, monkeypatch):
+    db_path = tmp_path / "test.db"
+    seed_db(db_path)
+    monkeypatch.setattr(analytics, "connect", lambda: connect(db_path))
+    outdir = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["analytics.py", "--item", "Milk", "--basket", "Milk", "--outdir", str(outdir)],
+    )
+    analytics.main()
+    assert (outdir / "trend_milk.png").exists()
+    assert (outdir / "basket_by_city.png").exists()
+
+
+def test_main_with_no_data_prints_message(tmp_path, monkeypatch, capsys):
+    db_path = tmp_path / "empty.db"
+    with connect(db_path) as con:
+        exec_script(con, SCHEMA)
+    monkeypatch.setattr(analytics, "connect", lambda: connect(db_path))
+    outdir = tmp_path / "out"
+    monkeypatch.setattr("sys.argv", ["analytics.py", "--outdir", str(outdir)])
+    analytics.main()
+    assert "No data available" in capsys.readouterr().out
+
+
+def test_main_with_unknown_item_prints_no_data_message(tmp_path, monkeypatch, capsys):
+    db_path = tmp_path / "test.db"
+    seed_db(db_path)
+    monkeypatch.setattr(analytics, "connect", lambda: connect(db_path))
+    outdir = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv", ["analytics.py", "--item", "Nonexistent", "--outdir", str(outdir)]
+    )
+    analytics.main()
+    assert "No data for item 'Nonexistent'" in capsys.readouterr().out

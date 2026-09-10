@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import sqlite3
 from pathlib import Path
@@ -14,6 +15,25 @@ def _default_db_path() -> Path:
     """Resolve the DB path, honoring the CPT_DB_PATH env var override."""
     override = os.environ.get("CPT_DB_PATH")
     return Path(override) if override else DEFAULT_DB_PATH
+
+
+def add_db_arg(parser: argparse.ArgumentParser) -> None:
+    """Add a shared --db flag to `parser`.
+
+    Precedence when omitted: CPT_DB_PATH env var, then DEFAULT_DB_PATH
+    (<repo_root>/data/prices.db). Every CLI script uses this so `--db` behaves
+    identically everywhere instead of each script inventing its own default.
+    """
+    parser.add_argument(
+        "--db",
+        default=None,
+        help=f"Path to SQLite DB (default: $CPT_DB_PATH or {DEFAULT_DB_PATH})",
+    )
+
+
+def resolve_db_path(db_arg: str | None) -> Path | None:
+    """Turn an optional --db CLI value into a Path, or None to use the default."""
+    return Path(db_arg) if db_arg else None
 
 
 def connect(db_path: Path | None = None) -> sqlite3.Connection:
@@ -60,7 +80,7 @@ def get_or_create_item(
                 (unit.strip(), row["id"]),
             )
             con.commit()
-        return row["id"]
+        return int(row["id"])
     cur = con.execute(
         "INSERT INTO item(name, category, unit) VALUES(?, ?, ?)",
         (name, (category or "general").strip() or "general", unit.strip() or "unit"),
@@ -86,7 +106,7 @@ def get_or_create_store(
         (name, city),
     ).fetchone()
     if row:
-        return row["id"]
+        return int(row["id"])
     cur = con.execute(
         "INSERT INTO store(name, city) VALUES(?, ?)",
         (name, city or None),

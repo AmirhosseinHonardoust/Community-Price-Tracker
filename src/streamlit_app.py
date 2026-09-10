@@ -32,23 +32,27 @@ with tab1:
         items = q(con, "SELECT id, name, unit FROM item ORDER BY name")
         stores = q(con, "SELECT id, name, city FROM store ORDER BY name")
     col1, col2 = st.columns(2)
-    new_item = col1.text_input("New item name (optional)")
+    new_item = col1.text_input("New item name (optional)", key="new_item")
     item_options = {f"{x['name']} ({x['unit']})": x["id"] for x in items}
-    item_select = col2.selectbox("Existing item", ["-- Select --"] + list(item_options.keys()))
-    price = st.number_input("Price", min_value=0.0, step=0.1)
-    currency = st.text_input("Currency", value="USD")
-    quantity = st.number_input("Quantity (in item units)", min_value=0.1, value=1.0, step=0.1)
-    d = st.date_input("Date", value=date.today())
+    item_select = col2.selectbox(
+        "Existing item", ["-- Select --"] + list(item_options.keys()), key="item_select"
+    )
+    price = st.number_input("Price", min_value=0.0, step=0.1, key="price")
+    currency = st.text_input("Currency", value="USD", key="currency")
+    quantity = st.number_input(
+        "Quantity (in item units)", min_value=0.1, value=1.0, step=0.1, key="quantity"
+    )
+    d = st.date_input("Date", value=date.today(), key="log_date")
 
     st.markdown("**Store**")
     col3, col4 = st.columns(2)
-    new_store = col3.text_input("New store name (optional)")
-    new_city = col4.text_input("City (optional)")
+    new_store = col3.text_input("New store name (optional)", key="new_store")
+    new_city = col4.text_input("City (optional)", key="new_city")
     store_options = {"-- None --": None}
     store_options.update({f"{x['name']} ({x['city'] or 'unknown'})": x["id"] for x in stores})
-    store_select = st.selectbox("Existing store", list(store_options.keys()))
+    store_select = st.selectbox("Existing store", list(store_options.keys()), key="store_select")
 
-    if st.button("Save price"):
+    if st.button("Save price", key="save_price_btn"):
         with connect() as con:
             if new_item.strip():
                 qi(
@@ -127,8 +131,8 @@ with tab2:
 
 with tab3:
     st.subheader("Trends")
-    item_name = st.text_input("Item name to visualize (exact)", value="Milk")
-    if st.button("Show trend"):
+    item_name = st.text_input("Item name to visualize (exact)", value="Milk", key="trend_item")
+    if st.button("Show trend", key="show_trend_btn"):
         with connect() as con:
             rows = q(
                 con,
@@ -163,8 +167,10 @@ with tab3:
 
 with tab4:
     st.subheader("Basket Cost by City")
-    basket = st.text_input("Items (comma-separated)", value="Milk,Bread,Eggs")
-    if st.button("Compare basket"):
+    basket = st.text_input(
+        "Items (comma-separated)", value="Milk,Bread,Eggs", key="basket_items_input"
+    )
+    if st.button("Compare basket", key="compare_basket_btn"):
         basket_items = [x.strip() for x in basket.split(",") if x.strip()]
         if not basket_items:
             st.warning("Enter at least one item.")

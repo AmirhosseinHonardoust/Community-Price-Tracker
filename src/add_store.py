@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from db import connect, get_or_create_store
+from db import add_db_arg, connect, get_or_create_store, resolve_db_path
 
 
 def main() -> None:
@@ -14,9 +14,10 @@ def main() -> None:
     ap.add_argument("--city", default="")
     ap.add_argument("--lat", type=float, default=None)
     ap.add_argument("--lon", type=float, default=None)
+    add_db_arg(ap)
     args = ap.parse_args()
 
-    with connect() as con:
+    with connect(resolve_db_path(args.db)) as con:
         # BEHAVIOR CHANGE: previously this always inserted a new row, so running
         # this command twice with the same name/city silently created duplicate
         # stores. It now reuses the existing store, matching import_csv.py's

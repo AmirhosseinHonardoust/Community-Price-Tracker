@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from db import connect, get_or_create_item
+from db import add_db_arg, connect, get_or_create_item, resolve_db_path
 
 
 def main() -> None:
@@ -13,9 +13,10 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--category", default="general")
     ap.add_argument("--unit", default="unit", help="kg, liter, loaf, dozen, etc.")
+    add_db_arg(ap)
     args = ap.parse_args()
 
-    with connect() as con:
+    with connect(resolve_db_path(args.db)) as con:
         item_id = get_or_create_item(con, args.name, args.unit, args.category)
     print(f"Item ready with id={item_id} ✅")
 
