@@ -1,0 +1,13 @@
+# Generated data & charts (created by src/generate_data.py, init_db.py, analytics.py)
+data/*.db
+data/*.csv
+outputs/*.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
