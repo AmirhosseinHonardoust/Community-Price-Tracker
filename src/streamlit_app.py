@@ -1,34 +1,28 @@
 #!/usr/bin/env python3
+"""Streamlit UI: log price observations and view trend/basket charts."""
+
 from __future__ import annotations
+
 from datetime import date
-import sys
+
 import pandas as pd
 import streamlit as st
+
+from dataframe_utils import require_columns, rows_to_df
 from db import connect, q, qi
 
 st.set_page_config(page_title="Community Price Tracker", page_icon="🧾", layout="centered")
 st.title("🧾 Community Price Tracker")
 
-# -------- helpers --------
-def rows_to_df(rows) -> pd.DataFrame:
-    """Always return a DataFrame with named columns."""
-    if not rows:
-        return pd.DataFrame()
-    try:
-        return pd.DataFrame([dict(r) for r in rows])  # sqlite3.Row -> dict
-    except Exception:
-        return pd.DataFrame(rows)  # fallback (no names)
 
 def assert_columns(df: pd.DataFrame, required: set[str], context: str) -> None:
-    missing = required - set(map(str, df.columns))
-    if missing:
-        st.error(
-            f"❌ Missing expected columns in {context}: {sorted(missing)}\n\n"
-            f"Seen columns: {list(df.columns)}\n\n"
-            "Fix: delete `data/prices.db`, run `python src/init_db.py`, "
-            "then add prices again with `src/add_price.py`."
-        )
+    """Stop the page with a friendly error if `df` is missing required columns."""
+    try:
+        require_columns(df, required, context)
+    except ValueError as exc:
+        st.error(f"❌ {exc}")
         st.stop()
+
 
 tab1, tab2, tab3, tab4 = st.tabs(["Log Price", "Items & Stores", "Trends", "Basket"])
 
@@ -57,8 +51,14 @@ with tab1:
     if st.button("Save price"):
         with connect() as con:
             if new_item.strip():
-                qi(con, "INSERT OR IGNORE INTO item(name, category, unit) VALUES(?, 'general', 'unit')", (new_item.strip(),))
-                item_id = q(con, "SELECT id FROM item WHERE name=? ORDER BY id DESC", (new_item.strip(),))[0]["id"]
+                qi(
+                    con,
+                    "INSERT OR IGNORE INTO item(name, category, unit) VALUES(?, 'general', 'unit')",
+                    (new_item.strip(),),
+                )
+                item_id = q(
+                    con, "SELECT id FROM item WHERE name=? ORDER BY id DESC", (new_item.strip(),)
+                )[0]["id"]
             else:
                 if item_select == "-- Select --":
                     st.error("Choose an existing item or enter a new one.")
@@ -66,21 +66,34 @@ with tab1:
                 item_id = item_options[item_select]
 
             if new_store.strip():
-                qi(con, "INSERT INTO store(name, city) VALUES(?,?)", (new_store.strip(), new_city.strip() or None))
-                store_id = q(con, "SELECT id FROM store WHERE name=? ORDER BY id DESC", (new_store.strip(),))[0]["id"]
+                qi(
+                    con,
+                    "INSERT INTO store(name, city) VALUES(?,?)",
+                    (new_store.strip(), new_city.strip() or None),
+                )
+                store_id = q(
+                    con, "SELECT id FROM store WHERE name=? ORDER BY id DESC", (new_store.strip(),)
+                )[0]["id"]
             else:
                 store_id = store_options[store_select]
 
-            qi(con, "INSERT INTO price(item_id, store_id, price, currency, quantity, date) VALUES(?,?,?,?,?,?)",
-               (item_id, store_id, float(price), currency.strip(), float(quantity), d.isoformat()))
+            qi(
+                con,
+                "INSERT INTO price(item_id, store_id, price, currency, quantity, date) "
+                "VALUES(?,?,?,?,?,?)",
+                (item_id, store_id, float(price), currency.strip(), float(quantity), d.isoformat()),
+            )
         st.success("Price logged ✅")
 
 with tab2:
     st.subheader("Items, Stores & Recent Prices")
     with connect() as con:
-        items = rows_to_df(q(con, "SELECT * FROM item ORDER BY name"))
-        stores = rows_to_df(q(con, "SELECT * FROM store ORDER BY name"))
-        prices = rows_to_df(q(con, """
+        items_df = rows_to_df(q(con, "SELECT * FROM item ORDER BY name"))
+        stores_df = rows_to_df(q(con, "SELECT * FROM store ORDER BY name"))
+        prices_df = rows_to_df(
+            q(
+                con,
+                """
             SELECT
               p.id,
               i.name  AS item,
@@ -96,22 +109,30 @@ with tab2:
             LEFT JOIN store s ON s.id = p.store_id
             ORDER BY p.date DESC
             LIMIT 500
-        """))
+        """,
+            )
+        )
     st.write("**Items**")
-    st.dataframe(items)
+    st.dataframe(items_df)
     st.write("**Stores**")
-    st.dataframe(stores)
+    st.dataframe(stores_df)
     st.write("**Recent Prices**")
-    if not prices.empty:
-        assert_columns(prices, {"item","unit","store","city","price","currency","quantity","date"}, "Recent Prices")
-    st.dataframe(prices)
+    if not prices_df.empty:
+        assert_columns(
+            prices_df,
+            {"item", "unit", "store", "city", "price", "currency", "quantity", "date"},
+            "Recent Prices",
+        )
+    st.dataframe(prices_df)
 
 with tab3:
     st.subheader("Trends")
     item_name = st.text_input("Item name to visualize (exact)", value="Milk")
     if st.button("Show trend"):
         with connect() as con:
-            rows = q(con, """
+            rows = q(
+                con,
+                """
                 SELECT
                   i.name AS item,
                   i.unit AS unit,
@@ -123,27 +144,32 @@ with tab3:
                 LEFT JOIN item  i ON i.id = p.item_id
                 LEFT JOIN store s ON s.id = p.store_id
                 WHERE lower(i.name) = lower(?)
-            """, (item_name.strip(),))
-        df = rows_to_df(rows)
-        if df.empty:
+            """,
+                (item_name.strip(),),
+            )
+        trend_df = rows_to_df(rows)
+        if trend_df.empty:
             st.warning("No data for that item yet.")
         else:
-            assert_columns(df, {"item","unit","city","price","quantity","date"}, "Trends query")
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df["unit_price"] = df["price"] / df["quantity"].replace(0, pd.NA)
-            pivot = (df.pivot_table(index="date", columns="city", values="unit_price", aggfunc="mean")
-                       .sort_index())
+            assert_columns(
+                trend_df, {"item", "unit", "city", "price", "quantity", "date"}, "Trends query"
+            )
+            trend_df["date"] = pd.to_datetime(trend_df["date"], errors="coerce")
+            trend_df["unit_price"] = trend_df["price"] / trend_df["quantity"].replace(0, pd.NA)
+            pivot = trend_df.pivot_table(
+                index="date", columns="city", values="unit_price", aggfunc="mean"
+            ).sort_index()
             st.line_chart(pivot)
 
 with tab4:
     st.subheader("Basket Cost by City")
     basket = st.text_input("Items (comma-separated)", value="Milk,Bread,Eggs")
     if st.button("Compare basket"):
-        items = [x.strip() for x in basket.split(",") if x.strip()]
-        if not items:
+        basket_items = [x.strip() for x in basket.split(",") if x.strip()]
+        if not basket_items:
             st.warning("Enter at least one item.")
         else:
-            qmarks = ",".join("?" * len(items))
+            qmarks = ",".join("?" * len(basket_items))
             sql = f"""
                 SELECT
                   i.name AS item,
@@ -157,17 +183,24 @@ with tab4:
                 WHERE lower(i.name) IN ({qmarks})
             """
             with connect() as con:
-                rows = q(con, sql, tuple(map(str.lower, items)))
-            df = rows_to_df(rows)
-            if df.empty:
+                rows = q(con, sql, tuple(map(str.lower, basket_items)))
+            basket_df = rows_to_df(rows)
+            if basket_df.empty:
                 st.warning("No data for these items yet.")
             else:
-                assert_columns(df, {"item","city","price","quantity","date"}, "Basket query")
-                latest = (df.assign(date=pd.to_datetime(df["date"], errors="coerce"))
-                            .sort_values("date")
-                            .assign(unit_price=lambda d: d["price"]/d["quantity"].replace(0, pd.NA))
-                            .groupby(["city","item"]).tail(1))
-                basket_cost = latest.groupby("city")["unit_price"].sum().sort_values(ascending=False)
+                assert_columns(
+                    basket_df, {"item", "city", "price", "quantity", "date"}, "Basket query"
+                )
+                latest = (
+                    basket_df.assign(date=pd.to_datetime(basket_df["date"], errors="coerce"))
+                    .sort_values("date")
+                    .assign(unit_price=lambda d: d["price"] / d["quantity"].replace(0, pd.NA))
+                    .groupby(["city", "item"])
+                    .tail(1)
+                )
+                basket_cost = (
+                    latest.groupby("city")["unit_price"].sum().sort_values(ascending=False)
+                )
                 st.bar_chart(basket_cost)
 
 st.caption("Built with SQLite + Streamlit • Store local, share insights global 🌍")

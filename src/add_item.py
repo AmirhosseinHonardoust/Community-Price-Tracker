@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+"""CLI to add a new item (e.g., Bread, Milk). Idempotent by name."""
+
 from __future__ import annotations
+
 import argparse
-from db import connect, qi
+
+from db import connect, get_or_create_item
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Add a new item (e.g., Bread, Milk).")
@@ -11,9 +16,9 @@ def main() -> None:
     args = ap.parse_args()
 
     with connect() as con:
-        rowid = qi(con, "INSERT OR IGNORE INTO item(name, category, unit) VALUES(?,?,?)",
-                   (args.name.strip(), args.category.strip(), args.unit.strip())).lastrowid
-    print(f"Item added (or already existed). id={rowid if rowid else 'existing'} ✅")
+        item_id = get_or_create_item(con, args.name, args.unit, args.category)
+    print(f"Item ready with id={item_id} ✅")
+
 
 if __name__ == "__main__":
     main()

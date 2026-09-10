@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
+"""Generate price-trend and basket-cost charts from the SQLite database."""
+
 from __future__ import annotations
+
 import argparse
-from pathlib import Path
 import sys
-import pandas as pd
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import pandas as pd
+
+from dataframe_utils import require_columns, rows_to_df
 from db import connect, q
 
+
 def ensure_outdir(p: Path) -> Path:
+    """Create `p` (and parents) if needed and return it."""
     p.mkdir(parents=True, exist_ok=True)
     return p
 
-def _rows_to_df(rows) -> pd.DataFrame:
-    """
-    Convert sqlite rows to a DataFrame with proper column names.
-    Handles cases where rows are sqlite3.Row or plain tuples.
-    """
-    if not rows:
-        return pd.DataFrame()
-    try:
-        # sqlite3.Row is mapping-like: dict(row) works
-        return pd.DataFrame([dict(r) for r in rows])
-    except Exception:
-        # Fallback: use cursor description — but we don't have cursor here.
-        # So just coerce, and we’ll validate later.
-        return pd.DataFrame(rows)
 
 def load_prices_df() -> pd.DataFrame:
+    """Load all price observations joined with item/store info, with unit_price computed."""
     with connect() as con:
-        rows = q(con, """
+        rows = q(
+            con,
+            """
             SELECT
               p.id,
               i.name AS item,
@@ -41,26 +38,27 @@ def load_prices_df() -> pd.DataFrame:
             FROM price p
             LEFT JOIN item i ON i.id = p.item_id
             LEFT JOIN store s ON s.id = p.store_id
-        """)
-    df = _rows_to_df(rows)
+        """,
+        )
+    df = rows_to_df(rows)
     if df.empty:
         return df
 
-    # Validate columns
-    required = {"item", "unit", "city", "price", "quantity", "currency", "date"}
-    missing = required - set(df.columns.astype(str))
-    if missing:
-        print("❌ Expected columns missing in query result:", sorted(missing))
-        print("Columns I actually see:", list(df.columns))
-        print("Tip: delete data/prices.db, re-run init_db.py, then add prices again.")
+    try:
+        require_columns(
+            df, {"item", "unit", "city", "price", "quantity", "currency", "date"}, "price query"
+        )
+    except ValueError as exc:
+        print(f"❌ {exc}")
         sys.exit(1)
 
-    # Safe conversions
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["unit_price"] = df["price"] / df["quantity"].replace(0, pd.NA)
     return df
 
+
 def plot_trend(df: pd.DataFrame, item: str, outdir: Path) -> Path | None:
+    """Plot unit-price trend for `item` by city; returns the saved PNG path, or None."""
     dfi = df[df["item"].str.lower() == item.lower()].copy()
     if dfi.empty:
         return None
@@ -73,13 +71,15 @@ def plot_trend(df: pd.DataFrame, item: str, outdir: Path) -> Path | None:
     plt.ylabel("Unit Price")
     plt.legend()
     plt.grid(True, alpha=0.3)
-    p = outdir / f"trend_{item.replace(' ','_').lower()}.png"
+    p = outdir / f"trend_{item.replace(' ', '_').lower()}.png"
     plt.tight_layout()
     plt.savefig(p, dpi=150)
     plt.close()
     return p
 
+
 def plot_basket(df: pd.DataFrame, items: list[str], outdir: Path) -> Path | None:
+    """Plot summed latest unit price of `items` by city; returns the saved PNG path, or None."""
     dff = df[df["item"].str.lower().isin([x.lower() for x in items])].copy()
     if dff.empty:
         return None
@@ -95,6 +95,7 @@ def plot_basket(df: pd.DataFrame, items: list[str], outdir: Path) -> Path | None
     plt.savefig(p, dpi=150)
     plt.close()
     return p
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate charts from stored prices.")
@@ -116,6 +117,7 @@ def main() -> None:
     if args.basket:
         p = plot_basket(df, args.basket, out)
         print(f"Basket saved: {p}" if p else "No data for selected basket.")
+
 
 if __name__ == "__main__":
     main()
