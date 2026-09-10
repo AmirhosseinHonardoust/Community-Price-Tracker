@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from dataframe_utils import require_columns, rows_to_df, with_unit_price
-from db import connect, price_rows, q, qi
+from db import connect, get_or_create_item, get_or_create_store, price_rows, q, qi
 
 st.set_page_config(page_title="Community Price Tracker", page_icon="🧾", layout="centered")
 st.title("🧾 Community Price Tracker")
@@ -55,14 +55,11 @@ with tab1:
     if st.button("Save price", key="save_price_btn"):
         with connect() as con:
             if new_item.strip():
-                qi(
-                    con,
-                    "INSERT OR IGNORE INTO item(name, category, unit) VALUES(?, 'general', 'unit')",
-                    (new_item.strip(),),
-                )
-                item_id = q(
-                    con, "SELECT id FROM item WHERE name=? ORDER BY id DESC", (new_item.strip(),)
-                )[0]["id"]
+                # BUG FIX: this used to INSERT OR IGNORE + re-select by name,
+                # duplicating get_or_create_item's logic without its unit
+                # backfill. Reusing the shared helper keeps this in sync with
+                # the CLI (add_item.py) instead of drifting.
+                item_id = get_or_create_item(con, new_item.strip())
             else:
                 if item_select == "-- Select --":
                     st.error("Choose an existing item or enter a new one.")
@@ -70,14 +67,13 @@ with tab1:
                 item_id = item_options[item_select]
 
             if new_store.strip():
-                qi(
-                    con,
-                    "INSERT INTO store(name, city) VALUES(?,?)",
-                    (new_store.strip(), new_city.strip() or None),
-                )
-                store_id = q(
-                    con, "SELECT id FROM store WHERE name=? ORDER BY id DESC", (new_store.strip(),)
-                )[0]["id"]
+                # BUG FIX: this used to always INSERT a new store row, so
+                # logging a price for the same new store name+city twice (e.g.
+                # two form submits) created duplicate store rows and split
+                # that store's price history across two ids. add_store.py was
+                # fixed for this same issue previously; reusing
+                # get_or_create_store here keeps both entry points consistent.
+                store_id = get_or_create_store(con, new_store.strip(), new_city.strip())
             else:
                 store_id = store_options[store_select]
 

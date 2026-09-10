@@ -1,3 +1,27 @@
+[project]
+name = "community-price-tracker"
+version = "0.1.0"
+description = "A community-driven data app for logging and analyzing the prices of everyday goods."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "pandas>=2.0.0",
+    "tabulate>=0.9.0",
+    "streamlit>=1.36.0",
+    "matplotlib>=3.7.0",
+]
+
+# NOTE: intentionally no [build-system]/console-script entry points yet.
+# src/ is a flat set of generically-named modules (db.py, analytics.py, ...)
+# rather than a proper package, so `pip install .` would either fail or expose
+# top-level import names like `db` that are likely to collide with other
+# installed packages. Making this properly installable needs src/ reorganized
+# into a real package (e.g. src/cpt/) with internal imports updated to match,
+# which is a larger, riskier change than fits alongside the fixes in this PR.
+# Metadata here documents the project without claiming installability it
+# doesn't safely have.
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

@@ -8,6 +8,11 @@ import random
 from datetime import date, timedelta
 from pathlib import Path
 
+# How many days of history to generate, ending today. A rolling window (rather
+# than a hardcoded past end_date) keeps demo data from looking stale the
+# longer this repo sits untouched.
+LOOKBACK_DAYS = 300
+
 ITEMS = [
     ("Milk", "liter"),
     ("Bread", "loaf"),
@@ -38,17 +43,24 @@ DEFAULT_COUNT = 1000
 DEFAULT_OUTFILE = Path(__file__).resolve().parents[1] / "data" / "generated_prices.csv"
 
 
-def generate(outfile: Path | None = None, count: int = DEFAULT_COUNT) -> Path:
+def generate(
+    outfile: Path | None = None,
+    count: int = DEFAULT_COUNT,
+    end_date: date | None = None,
+) -> Path:
     """Generate `count` synthetic price rows and write them to `outfile` as CSV.
 
-    Returns the path written to. Defaults to DEFAULT_OUTFILE.
+    Dates span `LOOKBACK_DAYS` days ending at `end_date` (defaults to today),
+    so a fresh clone always gets recent-looking demo data instead of a
+    hardcoded past window. Returns the path written to. Defaults to
+    DEFAULT_OUTFILE.
     """
     out = outfile or DEFAULT_OUTFILE
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    start_date = date(2025, 1, 1)
-    end_date = date(2025, 10, 25)
-    days = (end_date - start_date).days
+    end = end_date or date.today()
+    start_date = end - timedelta(days=LOOKBACK_DAYS)
+    days = (end - start_date).days
 
     rows = []
     for _ in range(count):

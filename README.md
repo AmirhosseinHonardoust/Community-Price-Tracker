@@ -56,6 +56,7 @@ Community-Price-Tracker/
 │   ├── analytics.py              # Generates charts
 │   ├── streamlit_app.py          # Interactive web app
 │   ├── add_item.py / add_store.py / add_price.py / list_data.py
+│   ├── delete_price.py           # Delete a price observation by id
 │
 ├── tests/                        # pytest suite (see Development below)
 │
@@ -161,6 +162,12 @@ Prices
 |------|--------|----------|-------|------------|
 | Milk | Market 1 | Helsinki | 1.35 | 2025-10-26 |
 ```
+
+### Delete a mis-entered price
+```bash
+python src/delete_price.py --id 42
+```
+Find the id to delete from the `Prices` table printed by `list_data.py`.
 
 ---
 
