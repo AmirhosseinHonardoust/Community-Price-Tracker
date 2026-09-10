@@ -107,7 +107,7 @@ A production-grade cost-of-living tool would need verified data sources, a much 
 - **Streamlit dashboard** for interactive, non-technical use
 - **Command-line tools** for adding, listing, and deleting records
 - **Unit tests and GitHub Actions CI**
-- **100% local, privacy-friendly** — nothing leaves your machine
+- **100% local, privacy-friendly**, nothing leaves your machine
 
 ---
 
@@ -425,7 +425,7 @@ CI is defined in:
 .github/workflows/ci.yml
 ```
 
-`requirements.lock` pins exact, known-good versions (generated for Python 3.11, matching CI) for a reproducible local install — CI itself installs from the loose ranges in `requirements.txt`.
+`requirements.lock` pins exact, known-good versions (generated for Python 3.11, matching CI) for a reproducible local install, CI itself installs from the loose ranges in `requirements.txt`.
 
 ---
 
