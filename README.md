@@ -1,6 +1,7 @@
 <div align="center">
 
 # Community Price Tracker
+<img width="1672" height="941" alt="Community-Price-Tracker" src="https://github.com/user-attachments/assets/76ca47ef-e64b-44be-abdf-4e47ccc431cb" />
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![SQLite](https://img.shields.io/badge/SQLite-Local%20Storage-orange)
