@@ -15,7 +15,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           pip install -r requirements-dev.txt
       - name: Ruff
         run: ruff check --select E,F,I,B,SIM,UP --line-length 100 src tests
@@ -23,5 +23,5 @@ jobs:
         run: black --check --line-length 100 src tests
       - name: Mypy
         run: mypy --ignore-missing-imports src
-      - name: Pytest
-        run: pytest -q
+      - name: Pytest (with coverage)
+        run: pytest -q --cov=src --cov-report=term-missing --cov-fail-under=85
