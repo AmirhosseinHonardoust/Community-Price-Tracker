@@ -28,3 +28,12 @@ CREATE TABLE IF NOT EXISTS price (
 
 CREATE INDEX IF NOT EXISTS idx_price_item_date ON price(item_id, date);
 CREATE INDEX IF NOT EXISTS idx_price_store_date ON price(store_id, date);
+
+-- Defense in depth: get_or_create_store() in db.py already dedupes stores by
+-- (name, COALESCE(city,'')) at the app level, but nothing previously stopped
+-- a duplicate row if that helper were bypassed (this is exactly how the
+-- streamlit_app.py "new store" bug produced duplicate stores before it was
+-- fixed to call get_or_create_store()). This mirrors that same lookup
+-- expression so any duplicate insert now fails loudly instead of silently
+-- fragmenting a store's price history across two ids.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_store_name_city ON store(name, COALESCE(city, ''));
